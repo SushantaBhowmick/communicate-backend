@@ -23,8 +23,12 @@ jobs:
       - name: Deploy to EC2
         run: |
           ssh -i ~/.ssh/github-ec2-key ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            set e
             cd ${{ secrets.EC2_PATH }} 
             git pull origin master
             npm install --production
+            echo "Building the project..."
+            npm run build || echo "No build step"
             pm2 restart all || pm2 start app.js   # adjust command if needed
+            pm2 save
           EOF
