@@ -18,13 +18,13 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_KEY }}" > ~/.ssh/github-ec2-key
           chmod 600 ~/.ssh/github-ec2-key
-          ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to EC2
         run: |
-          ssh -i ~/.ssh/github-ec2-key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-          cd /var/www/your-app   # change to your app directory
-          git pull origin master
-          npm install --production
-          pm2 restart all || pm2 start app.js   # adjust command if needed
+          ssh -i ~/.ssh/github-ec2-key ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            cd ${{ secrets.EC2_PATH }} 
+            git pull origin master
+            npm install --production
+            pm2 restart all || pm2 start app.js   # adjust command if needed
           EOF
