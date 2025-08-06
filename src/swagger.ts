@@ -4,8 +4,8 @@ const swaggerOptions = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "My API",
-      version: "1.0.0",
+      title: "My API- Sushanta Bhowmick",
+      version: "1.0.1",
       description: "API documentation for my backend",
     },
     servers: [
