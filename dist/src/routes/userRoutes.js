@@ -8,4 +8,5 @@ router.get("/search", authMiddleware_1.authMiddleware, userController_1.findUser
 router.get("/search-users", authMiddleware_1.authMiddleware, userController_1.searchUsers);
 router.put("/profile", authMiddleware_1.authMiddleware, userController_1.updateProfile);
 router.put("/push-token", authMiddleware_1.authMiddleware, userController_1.updateFCMToken);
+router.get("/", userController_1.getAllUsersrs);
 exports.default = router;

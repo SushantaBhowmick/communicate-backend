@@ -34,12 +34,12 @@ const login = async (req, res) => {
         const { email, password } = req.body;
         const user = await prisma_1.default.user.findUnique({ where: { email } });
         if (!user)
-            return res.status(400).json({ message: 'Invalid credentials' });
+            return res.status(400).json({ message: 'Invalid credentials ci/cd testing' });
         const token = (0, jwt_1.generateToken)(user.id);
         res.status(200).json({
             user: { id: user.id, name: user.name, email: user.email },
             token,
-            message: 'User logged in successfully'
+            message: 'User logged in successfully ci/cd testing'
         });
     }
     catch (error) {

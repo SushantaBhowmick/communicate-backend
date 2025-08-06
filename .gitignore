@@ -7,3 +7,5 @@ generated/prisma
 # Firebase service account files
 firebase-*.json
 serviceAccountKey.json
+dist
+/dist/*

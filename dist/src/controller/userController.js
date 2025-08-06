@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateFCMToken = exports.updateProfile = exports.searchUsers = exports.findUserByEmail = void 0;
+exports.updateFCMToken = exports.updateProfile = exports.searchUsers = exports.getAllUsersrs = exports.findUserByEmail = void 0;
 const prisma_1 = __importDefault(require("../config/prisma"));
 const findUserByEmail = async (req, res) => {
     const { email } = req.query;
@@ -17,6 +17,16 @@ const findUserByEmail = async (req, res) => {
     res.json({ user });
 };
 exports.findUserByEmail = findUserByEmail;
+const getAllUsersrs = async (req, res) => {
+    try {
+        const users = await prisma_1.default.user.findMany();
+        res.json({ users });
+    }
+    catch (error) {
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+exports.getAllUsersrs = getAllUsersrs;
 const searchUsers = async (req, res) => {
     try {
         const currentUserId = req.user.id;
