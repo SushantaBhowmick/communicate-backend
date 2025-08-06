@@ -3,27 +3,28 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - master   # Change this if you use a different branch
+      - master
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Connect & Deploy to EC2
-        uses: appleboy/ssh-action@v0.1.10
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd ${{ secrets.EC2_PATH }}
-            git reset --hard
-            git pull origin master
-            npm install --production
-            npm run build   # Only if you have a build step
-            pm2 restart communicate-backend || pm2 start dist/src/index.js --name communicate-backend
-            pm2 save
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/github-ec2-key
+          chmod 600 ~/.ssh/github-ec2-key
+          ssh-keyscan ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/github-ec2-key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          cd /var/www/your-app   # change to your app directory
+          git pull origin master
+          npm install --production
+          pm2 restart all || pm2 start app.js   # adjust command if needed
+          EOF
