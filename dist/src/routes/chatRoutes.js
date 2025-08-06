@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const authMiddleware_1 = require("../middleware/authMiddleware");
+const chatController_1 = require("../controller/chatController");
+const router = (0, express_1.Router)();
+router.route('/').post(authMiddleware_1.authMiddleware, chatController_1.createChat);
+router.route('/').get(authMiddleware_1.authMiddleware, chatController_1.getuserChats);
+router.route('/:chatId/invite').post(authMiddleware_1.authMiddleware, chatController_1.InviteToChat);
+router.route('/direct').post(authMiddleware_1.authMiddleware, chatController_1.startDirectChart);
+router.route('/:chatId').get(authMiddleware_1.authMiddleware, chatController_1.getChatById);
+router.route('/group').post(authMiddleware_1.authMiddleware, chatController_1.createGroupChat);
+router.route('/:chatId/info').get(authMiddleware_1.authMiddleware, chatController_1.getGroupcInfo);
+router.route('/:chatId/read').post(authMiddleware_1.authMiddleware, chatController_1.markChatAsReadController);
+exports.default = router;
