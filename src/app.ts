@@ -23,10 +23,18 @@ app.use("/api-docs", swaggerui.serve, swaggerui.setup(swaggerSpec));
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "success-s",
-    project: "Communicate",
+    project: "Communicate - Test",
     message: "Server is healthy and running",
   });
 });
+
+app.get("/test",(req,res)=>{
+  console.log(req.body);
+  return res.status(200).json({
+    success:true,
+    data:req.body,
+  })
+})
 
 app.use("/api/auth", authRoutes);
 app.use("/api/messages", messageRoutes);
