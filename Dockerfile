@@ -17,9 +17,12 @@ COPY . .
 # 6. Build (if using Typescript /bundler)
 RUN npm run build
 
-# 7. Expose app port
+# 7. Remove devDependencies to slim down (optional)
+RUN npm prune --production
+
+# 8. Expose app port
 ENV PORT=4000
 EXPOSE 4000
 
-# 8. Start with Node (or PM2 if you prefer)
+# 9. Start with Node (or PM2 if you prefer)
 CMD ["npm", "run", "start"]

@@ -22,9 +22,16 @@ app.use(express_1.default.urlencoded({ extended: true }));
 app.use("/api-docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.default.setup(swagger_1.swaggerSpec));
 app.get("/", (req, res) => {
     res.status(200).json({
-        status: "success",
+        status: "success-s",
         project: "Communicate",
         message: "Server is healthy and running",
+    });
+});
+app.get("/test", (req, res) => {
+    console.log(req.body);
+    return res.status(200).json({
+        success: true,
+        data: req.body,
     });
 });
 app.use("/api/auth", authRoutes_1.default);
