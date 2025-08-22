@@ -15,7 +15,7 @@ RUN npm install --production
 COPY . .
 
 # 6. Build (if using Typescript /bundler)
-RUN npm run Build
+RUN npm run build
 
 # 7. Expose app port
 ENV PORT=4000
