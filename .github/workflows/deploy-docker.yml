@@ -2,7 +2,7 @@ name: Deploy Backend (Docker)
 
 on:
   push:
-    branches: [ main ]   # change to master if you use master
+    branches: [ master ]   # change to master if you use master
     paths:
       - '**'
 
