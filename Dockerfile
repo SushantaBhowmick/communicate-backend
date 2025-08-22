@@ -6,7 +6,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 # 3. Copy pakcage files first (better cache)
-COPY pakcage*.json ./
+COPY package*.json ./
 
 # 4. Install dependencies 
 RUN npm install --production
@@ -21,5 +21,5 @@ RUN npm run Build
 ENV PORT=4000
 EXPOSE 4000
 
-# 8. Start with Node (or PM@ if you prefer)
-CMD [ "node", "dist/src/index.js" ]
+# 8. Start with Node (or PM2 if you prefer)
+CMD ["npm", "run", "start"]
