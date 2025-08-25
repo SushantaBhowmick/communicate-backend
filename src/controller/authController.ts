@@ -37,7 +37,11 @@ export const login = async (req: Request, res: Response) => {
 try {
     const { email, password } = req.body;
 
-   const user = await prisma.user.findUnique({where:{email}})
+    // console.log(email,password);
+
+   const user = await prisma.user.findUnique({where:{email}});
+
+//    console.log(user);
 
    if(!user) return res.status(400).json({message: 'Invalid credentials ci/cd testing'});
 

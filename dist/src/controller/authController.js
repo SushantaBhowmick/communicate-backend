@@ -32,7 +32,9 @@ const login = async (req, res) => {
     // console.log("Hello World controller")
     try {
         const { email, password } = req.body;
+        // console.log(email,password);
         const user = await prisma_1.default.user.findUnique({ where: { email } });
+        //    console.log(user);
         if (!user)
             return res.status(400).json({ message: 'Invalid credentials ci/cd testing' });
         const token = (0, jwt_1.generateToken)(user.id);

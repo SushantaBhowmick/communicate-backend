@@ -4,6 +4,7 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,42 +14,99 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+/* ------------------ Enums ------------------ */
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  text
+  image
+  video
+  file
+  audio      // generic audio (music, clip)
+  voice      // voice note recorded in-app
+  system     // join/leave, renames, etc.
+}
+
+enum ReceiptStatus {
+  sent        // server persisted the message
+  delivered   // reached recipient device/session
+  read        // recipient viewed it
+}
+
+enum CallType {
+  audio
+  video
+}
+
+enum CallStatus {
+  ringing
+  in_progress
+  ended
+  missed
+  rejected
+}
+
+/* ------------------ Core Models ------------------ */
+
 model User {
-  id          String       @id @default(uuid())
-  name        String
-  email       String       @unique
-  password    String
-  avatar      String?
-  username    String?
-  fcmToken String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  bio         String?
-  lastSeen    DateTime     @default(now())
-  isOnline    Boolean      @default(false)
-  messages    Message[]
-  chatMembers ChatMember[]
+  id             String              @id @default(uuid())
+  name           String
+  email          String              @unique
+  password       String
+  avatar         String?
+  username       String?
+  fcmToken       String?
+  bio            String?
+  lastSeen       DateTime            @default(now())
+  isOnline       Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  // Relations
+  messages       Message[]           @relation("MessageSender")
+  chatMembers    ChatMember[]
   chatReadStatus ChatReadStatus[]
+  notificationPrefs ChatNotificationPref[]
+  receipts       MessageReceipt[]
+
+  // Calls (optional convenience)
+  outgoingCalls  Call[]              @relation("CallCaller")
+  incomingCalls  Call[]              @relation("CallCallee")
 }
 
 model Chat {
-  id        String   @id @default(uuid())
-  name      String?
-  ownerId   String?
-  isGroup   Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String                 @id @default(uuid())
+  name        String?
+  ownerId     String?
+  isGroup     Boolean                @default(false)
+  /**
+   * For 1:1 DMs only: deterministic key "userIdA_userIdB" (sorted)
+   * Guarantees ONE DM per pair.
+   */
+  dmKey       String?                @unique
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
 
-  messages Message[]
-  members  ChatMember[]
-  readStatus ChatReadStatus[]
+  // Relations
+  messages    Message[]
+  members     ChatMember[]
+  readStatus  ChatReadStatus[]
+  notificationPrefs ChatNotificationPref[]
+  calls       Call[]
+
+  @@index([updatedAt])
 }
 
 model ChatMember {
   id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  chat      Chat     @relation(fields: [chatId], references: [id])
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
   chatId    String
   role      Role     @default(MEMBER)
   joinedAt  DateTime @default(now())
@@ -56,37 +114,126 @@ model ChatMember {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, chatId])
+  @@index([chatId])
 }
 
 model ChatReadStatus {
   id          String   @id @default(uuid())
-  user        User     @relation(fields: [userId], references: [id])
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
-  chat        Chat     @relation(fields: [chatId], references: [id])
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
   chatId      String
   lastReadAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@unique([userId, chatId])
+  @@index([chatId, lastReadAt])
 }
 
-enum Role {
-  ADMIN
-  MEMBER
+model ChatNotificationPref {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String
+  muted     Boolean  @default(false)
+  // future: mentionOnly, schedule windows, etc.
+
+  @@unique([userId, chatId])
 }
+
+/* ------------------ Messaging ------------------ */
 
 model Message {
-  id        String   @id @default(uuid())
-  content   String
-  type      String   @default("text")
-  chat      Chat     @relation(fields: [chatId], references: [id])
-  chatId    String
-  sender    User     @relation(fields: [senderId], references: [id])
-  senderId  String
-  seenBy    String[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(uuid())
+  content      String
+  type         MessageType   @default(text)
+  /**
+   * Flexible bucket for small structured data:
+   * - { width, height, durationMs, waveform: number[] }
+   * - { reply: { id, snippet, senderName } }
+   * - { filename, mime }
+   */
+  metadata     Json?
+  chat        Chat           @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId      String
+  sender      User           @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId    String
 
-  @@index([chatId])
+  // --- Reply / Quote (self relation)
+  replyTo     Message?       @relation("MessageReplies", fields: [replyToId], references: [id])
+  replyToId   String?
+  replies     Message[]      @relation("MessageReplies")
+
+  // --- Media / Files
+  attachments Attachment[]
+
+  // --- Delivery / Read Receipts
+  receipts    MessageReceipt[]
+
+  // Legacy field in your current schema — keep while migrating write-paths away from it.
+  seenBy      String[]       @default([]) // TODO: remove after receipts fully adopted
+
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([chatId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+model Attachment {
+  id          String   @id @default(uuid())
+  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId   String
+  url         String
+  mime        String
+  size        Int
+  width       Int?
+  height      Int?
+  durationMs  Int?
+  filename    String?
+  createdAt   DateTime @default(now())
+
+  @@index([messageId])
+  @@index([mime])
+}
+
+model MessageReceipt {
+  id         String        @id @default(uuid())
+  message    Message       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId  String
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  status     ReceiptStatus
+  at         DateTime      @default(now())
+
+  // Prevent duplicates per (message,user,status)
+  @@unique([messageId, userId, status])
+  @@index([userId, status, at])
+  @@index([messageId, status])
+}
+
+/* ------------------ Calls (1:1 first) ------------------ */
+
+model Call {
+  id        String    @id @default(uuid())
+  chat      Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    String
+
+  caller    User      @relation("CallCaller", fields: [callerId], references: [id], onDelete: SetNull)
+  callerId  String
+
+  // For Phase-1 we support only 1:1; for groups you’ll omit callee and derive from chat members
+  callee    User?     @relation("CallCallee", fields: [calleeId], references: [id], onDelete: SetNull)
+  calleeId  String?
+
+  type      CallType
+  status    CallStatus
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime   @default(now())
+
+  @@index([chatId, createdAt])
+  @@index([status])
 }

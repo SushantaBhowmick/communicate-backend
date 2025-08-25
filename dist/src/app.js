@@ -23,7 +23,7 @@ app.use("/api-docs", swagger_ui_express_1.default.serve, swagger_ui_express_1.de
 app.get("/", (req, res) => {
     res.status(200).json({
         status: "success-s",
-        project: "Communicate",
+        project: "Communicate-Test",
         message: "Server is healthy and running",
     });
 });
