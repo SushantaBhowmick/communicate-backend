@@ -82,75 +82,142 @@ export const registerMessageSocket = (io: Server, socket: Socket) => {
     socket.to(chatId).emit("typing:stopped", { chatId, userId });
   });
 
-  // ✅ Seen Message
-  socket.on(
-    "message:read",
-    async ({
-      chatId,
-      messageIds,
-    }: {
-      chatId: string;
-      messageIds: string[];
-    }) => {
-      try {
-        const allowed = await isUserInChat(userId, chatId);
-        if (!allowed) return socket.emit("error", "Unauthorized");
+  // // ✅ Seen Message
+  // socket.on(
+  //   "message:read",
+  //   async ({
+  //     chatId,
+  //     messageIds,
+  //   }: {
+  //     chatId: string;
+  //     messageIds: string[];
+  //   }) => {
+  //     try {
+  //       const allowed = await isUserInChat(userId, chatId);
+  //       if (!allowed) return socket.emit("error", "Unauthorized");
 
-        const now = new Date();
+  //       const now = new Date();
 
-        if (messageIds.length) {
+  //       if (messageIds.length) {
+  //         await prisma.messageReceipt.createMany({
+  //           data: messageIds.map((id) => ({
+  //             messageId: id,
+  //             userId,
+  //             status: "read",
+  //             at: now,
+  //           })),
+  //           skipDuplicates: true,
+  //         });
+  //       } else {
+  //         // Mark last N messages read
+  //         const recent = await prisma.message.findMany({
+  //           where: { chatId },
+  //           orderBy: { createdAt: "desc" },
+  //           take: 200,
+  //           select: { id: true },
+  //         });
+
+  //         console.log("recent",recent)
+  //         if (recent.length) {
+  //           await prisma.messageReceipt.createMany({
+  //             data: recent.map((m: any) => ({
+  //               messageId: m.id,
+  //               userId,
+  //               status: "read",
+  //               at: now,
+  //             })),
+  //             skipDuplicates: true,
+  //           });
+  //           messageIds = recent.map((m: any) => m.id);
+  //         }
+  //       }
+
+  //       //update fast unread counter
+  //       await prisma.chatReadStatus.upsert({
+  //         where: { userId_chatId: { userId, chatId } },
+  //         update: { lastReadAt: now },
+  //         create: { userId, chatId, lastReadAt: now },
+  //       });
+
+  //       io.to(chatId).emit("message:receipt", {
+  //         userId,
+  //         status: "read",
+  //         at: now,
+  //         messageIds: messageIds ?? [],
+  //       });
+  //     } catch (error) {
+  //       console.error("Failed to mark message as seen:", error);
+  //     }
+  //   }
+  // );
+
+  // ✅ Send a message
+  
+  // sockets/messages.ts (inside registerMessageSocket)
+socket.on(
+  "message:read",
+  async ({ chatId, messageIds }: { chatId: string; messageIds?: string[] }) => {
+    try {
+      const userId = socket.data.userId as string;
+      const allowed = await isUserInChat(userId, chatId);
+      if (!allowed) return socket.emit("error", "Unauthorized");
+
+      const now = new Date();
+
+      if (Array.isArray(messageIds) && messageIds.length > 0) {
+        await prisma.messageReceipt.createMany({
+          data: messageIds.map((mid) => ({
+            messageId: mid,
+            userId,
+            status: "read",
+            at: now,
+          })),
+          skipDuplicates: true,
+        });
+      } else {
+        // fallback: mark a recent window as read (idempotent)
+        const recent = await prisma.message.findMany({
+          where: { chatId },
+          orderBy: { createdAt: "desc" },
+          take: 200,
+          select: { id: true },
+        });
+        if (recent.length) {
           await prisma.messageReceipt.createMany({
-            data: messageIds.map((id) => ({
-              messageId: id,
+            data: recent.map((m) => ({
+              messageId: m.id,
               userId,
               status: "read",
               at: now,
             })),
             skipDuplicates: true,
           });
-        } else {
-          // Mark last N messages read
-          const recent = await prisma.message.findMany({
-            where: { chatId },
-            orderBy: { createdAt: "desc" },
-            take: 200,
-            select: { id: true },
-          });
-
-          if (recent.length) {
-            await prisma.messageReceipt.createMany({
-              data: recent.map((m: any) => ({
-                messageId: m.id,
-                userId,
-                status: "read",
-                at: now,
-              })),
-              skipDuplicates: true,
-            });
-            messageIds = recent.map((m: any) => m.id);
-          }
+          messageIds = recent.map((m) => m.id);
         }
-
-        //update fast unread counter
-        await prisma.chatReadStatus.upsert({
-          where: { userId_chatId: { userId, chatId } },
-          update: { lastReadAt: now },
-          create: { userId, chatId, lastReadAt: now },
-        });
-
-        io.to(chatId).emit("message:receipt", {
-          userId,
-          status: "read",
-          at: now,
-          messageIds: messageIds ?? [],
-        });
-      } catch (error) {
-        console.error("Failed to mark message as seen:", error);
       }
-    }
-  );
 
-  // ✅ Send a message
+      await prisma.chatReadStatus.upsert({
+        where: { userId_chatId: { userId, chatId } },
+        update: { lastReadAt: now },
+        create: { userId, chatId, lastReadAt: now },
+      });
+
+      // broadcast compact or per-id receipts (we send IDs if we have them)
+      socket.to(chatId).emit("message:receipt", {
+        userId,
+        status: "read",
+        at: now,
+        messageIds: messageIds ?? [],
+      });
+    } catch (err) {
+      console.error("message:read error:", err);
+      socket.emit("error", "Failed to mark as read");
+    }
+  }
+);
+
+  
+  
   socket.on("message:send", async (p: MessageSendPayload) => {
     try {
       if (!p.chatId || !p.content || typeof p.content !== "string")
